@@ -9,47 +9,93 @@ from app.features.insider_trading.models import InsiderTrade
 
 logger = logging.getLogger(__name__)
 
+
+def _is_announcement_subpage(url: str) -> bool:
+    return "/site/newkib/" in url
+
 def fetch_insider_news_job():
     logger.info("Starting insider trading job...")
-    
+
     try:
-        # 1. Scrape URLs (Dummy list for now)
-        client = LiferayClient(settings.BET_BASE_URL)
-        # client.authenticate(settings.BET_NEWS_API_URL)
-        # response = client.get_news("/hidden_api", {"category": "NEWS_NOT_BET"})
-        # urls = parse_urls(response)
-        urls = ["https://bet.hu/dummy_insider.pdf"] # Replace with actual logic
-        
-        with Session(engine) as session:
-            for url in urls:
-                # 2. Check global ops log
-                exists = session.exec(select(OpsDocumentLog).where(OpsDocumentLog.document_url == url)).first()
-                if exists:
-                    continue
-                
-                # 3. Download and parse
-                try:
-                    md_text = download_and_parse_pdf(url)
-                    
-                    # 4. Vibe check
-                    if vibe_check(md_text):
-                        # 5. Extract
-                        data = extract_insider_data(md_text)
-                        
-                        # 6. Save data
-                        trade = InsiderTrade(**data.model_dump(), document_url=url)
-                        session.add(trade)
-                    
-                    # 7. Update Ops Log
-                    log_entry = OpsDocumentLog(document_url=url, module_name="insider_trading", status="SUCCESS")
-                    session.add(log_entry)
-                    session.commit()
-                    
-                except Exception as e:
-                    logger.error(f"Error processing {url}: {e}")
-                    log_entry = OpsDocumentLog(document_url=url, module_name="insider_trading", status="FAILED")
-                    session.add(log_entry)
-                    session.commit()
-                    
+        with LiferayClient(settings.BET_BASE_URL) as client:
+            context = client.get_solr_search_context(settings.BET_NEWS_API_URL)
+
+            processed_new_documents = 0
+            failed_documents = 0
+            stale_pages = 0
+
+            with Session(engine) as session:
+                for page_index, page_payload in client.iterate_solr_pages(
+                    context=context,
+                    category="NEWS_NOT_BET",
+                    query="*",
+                    order_mode="DATE_DESC",
+                ):
+                    raw_links = client.extract_result_links(page_payload)
+                    subpages = [url for url in raw_links if _is_announcement_subpage(url)]
+                    if not subpages:
+                        continue
+
+                    page_has_new_documents = False
+
+                    for subpage in subpages:
+                        absolute_subpage = client.to_absolute_url(subpage)
+                        try:
+                            pdf_urls = client.get_pdf_urls_from_announcement_subpage(absolute_subpage)
+                        except Exception as exc:
+                            logger.warning("Failed to parse announcement subpage %s: %s", absolute_subpage, exc)
+                            continue
+
+                        for pdf_url in pdf_urls:
+                            exists = session.exec(
+                                select(OpsDocumentLog).where(OpsDocumentLog.document_url == pdf_url)
+                            ).first()
+                            if exists:
+                                continue
+
+                            page_has_new_documents = True
+
+                            try:
+                                md_text = download_and_parse_pdf(pdf_url)
+
+                                if vibe_check(md_text):
+                                    data = extract_insider_data(md_text)
+                                    trade = InsiderTrade(**data.model_dump(), document_url=pdf_url)
+                                    session.add(trade)
+
+                                log_entry = OpsDocumentLog(
+                                    document_url=pdf_url,
+                                    module_name="insider_trading",
+                                    status="SUCCESS",
+                                )
+                                session.add(log_entry)
+                                session.commit()
+                                processed_new_documents += 1
+                            except Exception as exc:
+                                logger.error("Error processing %s: %s", pdf_url, exc)
+                                log_entry = OpsDocumentLog(
+                                    document_url=pdf_url,
+                                    module_name="insider_trading",
+                                    status="FAILED",
+                                )
+                                session.add(log_entry)
+                                session.commit()
+                                failed_documents += 1
+
+                    if page_has_new_documents:
+                        stale_pages = 0
+                    else:
+                        stale_pages += 1
+
+                    # Sorted DATE_DESC means old pages after two stale pages are almost certainly already processed.
+                    if stale_pages >= 2:
+                        logger.info("Stopping early at page %s after stale window", page_index)
+                        break
+
+            logger.info(
+                "Insider job finished. New=%s Failed=%s",
+                processed_new_documents,
+                failed_documents,
+            )
     except Exception as e:
         logger.error(f"Job failed: {e}")
