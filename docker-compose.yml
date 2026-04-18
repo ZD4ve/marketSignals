@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    container_name: bet_data_pipeline
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - db
+    volumes:
+      - .:/app  # Hot-reloading for local development
+
+  db:
+    image: postgres:15-alpine
+    container_name: bet_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: bet_user
+      POSTGRES_PASSWORD: bet_password
+      POSTGRES_DB: bet_data
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
