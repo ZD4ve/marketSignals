@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Session, Field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from app.core.config import settings
 
@@ -10,7 +10,7 @@ class OpsDocumentLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     document_url: str = Field(unique=True, index=True)
     module_name: str
-    processed_at: datetime = Field(default_factory=datetime.utcnow)
+    processed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str
 
 def init_db():

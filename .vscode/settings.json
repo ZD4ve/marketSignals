@@ -1,5 +1,19 @@
 {
     "files.exclude": {
         "**/__pycache__": true
-    }
+    },
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "db",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "db",
+            "database": "bet_data",
+            "password": "bet_password",
+            "username": "bet_user"
+        }
+    ],
+    "python.terminal.useEnvFile": true
 }

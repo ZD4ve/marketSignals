@@ -1,7 +1,6 @@
 ---
 description: "Context and rules for modifying or extending the Insider Trading module. Use this when working on insider trading logic."
-applyTo:
-  - "app/features/insider_trading/**"
+applyTo: "app/features/insider_trading/**"
 ---
 
 # Insider Trading Module

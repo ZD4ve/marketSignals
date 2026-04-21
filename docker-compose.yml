@@ -15,9 +15,9 @@ services:
     container_name: bet_postgres
     restart: always
     environment:
-      POSTGRES_USER: bet_user
-      POSTGRES_PASSWORD: bet_password
-      POSTGRES_DB: bet_data
+      POSTGRES_USER: ${POSTGRES_USER:-bet_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bet_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bet_data}
     ports:
       - "5432:5432"
     volumes:

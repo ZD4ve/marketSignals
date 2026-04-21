@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import time
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -15,7 +16,7 @@ def main():
     scheduler = BackgroundScheduler()
     
     # Register jobs from modules
-    scheduler.add_job(fetch_insider_news_job, 'interval', minutes=15)
+    scheduler.add_job(fetch_insider_news_job, 'interval', minutes=15, next_run_time=datetime.now() + timedelta(seconds=5))
     
     scheduler.start()
     
