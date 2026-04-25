@@ -5,7 +5,17 @@
         "docker-compose.dev.yml"
     ],
     "service": "app",
+    "runServices": [
+        "app",
+        "db",
+        "pgadmin"
+    ],
     "workspaceFolder": "/app",
+    "shutdownAction": "stopCompose",
+    "forwardPorts": [
+        5432,
+        5050
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
@@ -21,13 +31,14 @@
                 "mtxr.sqltools-driver-pg"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python"
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.envFile": "${workspaceFolder}/.env"
             }
         }
     },
     // Run the container as root to avoid permission issues editing mounted files
     "remoteUser": "root",
-    "postCreateCommand": "pip install pytest debugpy ruff",
+    "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir pytest debugpy ruff",
     "features": {
         "ghcr.io/devcontainers/features/git:1": {}
     }

@@ -1,8 +1,7 @@
 import logging
 from sqlmodel import Session, select
 from app.core.database import engine, OpsDocumentLog
-from app.core.config import settings
-from app.scraper.client import LiferayClient
+from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 from app.utils.pdf import download_and_parse_pdf
 from app.features.insider_trading.processor import vibe_check, extract_insider_data
 from app.features.insider_trading.models import InsiderTrade
@@ -17,8 +16,8 @@ def fetch_insider_news_job():
     logger.info("Starting insider trading job...")
 
     try:
-        with LiferayClient(settings.BET_BASE_URL) as client:
-            context = client.get_solr_search_context(settings.BET_NEWS_API_URL)
+        with LiferayClient(BET_BASE_URL) as client:
+            context = client.get_solr_search_context(BET_NEWS_API_URL)
 
             processed_new_documents = 0
             failed_documents = 0

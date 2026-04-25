@@ -11,7 +11,7 @@
             "driver": "PostgreSQL",
             "name": "db",
             "database": "bet_data",
-            "password": "bet_password",
+            "password": "dev_postgres_password",
             "username": "bet_user"
         }
     ],

@@ -18,8 +18,7 @@ import argparse
 import json
 from pathlib import Path
 
-from app.core.config import settings
-from app.scraper.client import LiferayClient
+from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 
 
 def main() -> int:
@@ -48,11 +47,11 @@ def main() -> int:
     max_subpages = max(1, args.max_subpages)
 
     with LiferayClient(
-        settings.BET_BASE_URL,
+        BET_BASE_URL,
         min_delay_seconds=1.2,
         max_delay_seconds=3.0,
     ) as client:
-        context = client.get_solr_search_context(settings.BET_NEWS_API_URL)
+        context = client.get_solr_search_context(BET_NEWS_API_URL)
 
         print("Session established")
         print(f"- csrf token: {context.csrf_token}")

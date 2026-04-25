@@ -15,6 +15,8 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36"
 )
+BET_BASE_URL = "https://bet.hu"
+BET_NEWS_API_URL = "https://bet.hu/kereso?category=NEWS_NOT_BET"
 DEFAULT_FACETS = [
     "bet_date",
     "bet_type",

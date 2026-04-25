@@ -2,8 +2,7 @@ import json
 import os
 from typing import Optional
 
-from app.core.config import settings
-from app.scraper.client import LiferayClient
+from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 from app.utils.pdf import download_and_parse_pdf
 from app.features.insider_trading.processor import extract_insider_data, vibe_check
 
@@ -14,8 +13,8 @@ ROW_NUMBER = 4
 def fetch_api_page_links(page_number: int) -> list[str]:
     page_index = max(0, page_number - 1)
 
-    with LiferayClient(settings.BET_BASE_URL) as client:
-        context = client.get_solr_search_context(settings.BET_NEWS_API_URL)
+    with LiferayClient(BET_BASE_URL) as client:
+        context = client.get_solr_search_context(BET_NEWS_API_URL)
         page_payload = client.search_solr(
             context=context,
             category="NEWS_NOT_BET",
@@ -36,7 +35,7 @@ def fetch_pdf_from_row(page_links: list[str], row_number: int) -> Optional[str]:
     row_url = page_links[row_index]
     print(f"Using row {row_number} announcement page: {row_url}")
 
-    with LiferayClient(settings.BET_BASE_URL) as client:
+    with LiferayClient(BET_BASE_URL) as client:
         pdf_urls = client.get_pdf_urls_from_announcement_subpage(row_url)
 
     return pdf_urls[0] if pdf_urls else None

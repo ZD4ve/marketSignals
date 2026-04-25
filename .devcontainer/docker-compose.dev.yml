@@ -4,14 +4,32 @@ services:
     # This allows us to work inside it contextually (tests, scripts, git).
     command: /bin/sh -c "while sleep 1000; do :; done"
     restart: "no"
-    # Additional environment variables for dev can go here
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: bet_user
+      POSTGRES_PASSWORD: dev_postgres_password
+      POSTGRES_DB: bet_data
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      LLM_API_KEY: ${LLM_API_KEY:-dev_llm_key_placeholder}
+    volumes:
+      - .:/app:cached
+
+  db:
+    environment:
+      POSTGRES_USER: bet_user
+      POSTGRES_PASSWORD: dev_postgres_password
+      POSTGRES_DB: bet_data
+    ports:
+      - "5432:5432"
 
   pgadmin:
     image: dpage/pgadmin4
     container_name: bet_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-change_me_pgadmin_password}
     ports:
       - "5050:80"
     depends_on:

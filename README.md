@@ -17,7 +17,7 @@ The system operates as a headless background processor driven by `APScheduler`, 
 - **AI/LLM:** OpenAI Client (via OpenRouter), Instructor.
 - **Infrastructure:** Docker, Docker Compose, PostgreSQL.
 
-## Getting Started
+## Local Development (Dev Container)
 
 1. **Clone the repository:**
    ```bash
@@ -26,15 +26,59 @@ The system operates as a headless background processor driven by `APScheduler`, 
    ```
 
 2. **Configure Environment:**
-   Copy the example environment file and fill in your API keys (e.g., OpenRouter API key).
+   Copy the example environment file:
    ```bash
    cp .env.example .env
    ```
 
-3. **Deploy with Docker Compose:**
-   ```bash
-   docker-compose up -d --build
+   Keep the local `.env` minimal for devcontainer use:
+   ```dotenv
+   LLM_API_KEY=replace_with_openrouter_api_key
+   LLM_MODEL=anthropic/claude-3.5-sonnet
+   POSTGRES_PASSWORD=dev_postgres_password
    ```
+
+   Notes:
+   - `POSTGRES_PASSWORD` must exist locally so compose interpolation succeeds when VS Code starts the dev stack.
+   - The dev stack itself pins local DB credentials in `.devcontainer/docker-compose.dev.yml`.
+   - You do not need to set `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_HOST`, or `POSTGRES_PORT` in local `.env` for devcontainer workflow.
+
+3. **Open in Dev Container (recommended):**
+   - Open the repository in VS Code.
+   - Run `Dev Containers: Reopen in Container`.
+   - VS Code uses `.devcontainer/devcontainer.json` with `docker-compose.yml` plus `.devcontainer/docker-compose.dev.yml`.
+
+4. **Optional: Start the same dev stack from CLI:**
+   ```bash
+   docker compose -f docker-compose.yml -f .devcontainer/docker-compose.dev.yml up -d --build
+   ```
+
+## Portainer Deployment (Git Stack)
+
+Use `docker-compose.yml` as the stack file in Portainer Git deployment.
+
+Required Portainer stack environment variables:
+- `LLM_API_KEY`
+- `POSTGRES_PASSWORD`
+
+Optional overrides:
+- `LLM_BASE_URL`
+- `LLM_MODEL`
+- `POSTGRES_USER`
+- `POSTGRES_DB`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+
+Notes:
+- `docker-compose.yml` is deployment-oriented (no source bind mount).
+- Dev-only bind mounts and local conveniences are defined in `.devcontainer/docker-compose.dev.yml`.
+- `POSTGRES_PASSWORD` should be a strong deployment secret in Portainer (do not use local dev value).
+
+Recommended Portainer flow:
+1. Create a stack from your Git repository.
+2. Set compose path to `docker-compose.yml`.
+3. Define stack environment variables (required + optional overrides).
+4. Deploy the stack.
 
 ## Development & Extensibility
 This project relies closely on strict architectural rules outlined in `.github/copilot-instructions.md`. When developing new features, create a completely isolated folder inside `app/features/` containing its respective DB models, extraction schemas, and pipeline tasks.
