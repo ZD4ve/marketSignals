@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import date
 from enum import Enum
 
@@ -27,3 +27,70 @@ class EUMarArticle19(BaseModel):
     weighted_average_price: float = Field(description="Weighted average price of the transaction in HUF. Extract only the numeric float value. May be next to the aggregated volume.")
     date_of_transaction: date = Field(description="Date of the transaction.")
     place_of_transaction: str = Field(description="Place of the transaction (e.g., Budapesti Értéktőzsde, BÉT, OTC).")
+
+    @staticmethod
+    def _expand_isin_characters(value: str) -> str:
+        # ISO 6166 expands letters as A=10 ... Z=35 before applying Luhn.
+        return "".join(str(ord(char) - 55) if char.isalpha() else char for char in value)
+
+    @classmethod
+    def _passes_luhn(cls, digits: str) -> bool:
+        total = 0
+        for idx, char in enumerate(reversed(digits)):
+            digit = int(char)
+            if idx % 2 == 1:
+                digit *= 2
+                if digit > 9:
+                    digit -= 9
+            total += digit
+        return total % 10 == 0
+
+    @field_validator("isin")
+    @classmethod
+    def validate_isin_check_digit(cls, value: str) -> str:
+        expanded = cls._expand_isin_characters(value)
+        if not cls._passes_luhn(expanded):
+            raise ValueError("Invalid ISIN check digit.")
+        return value
+
+
+class InsiderExtractionResult(BaseModel):
+    """LLM output for either insider trade extraction or high-certainty rejection."""
+
+    is_insider_trading: bool = Field(
+        description="True when the document is an EU MAR Article 19 insider trading notification."
+    )
+    certainty: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Model certainty score between 0 and 1. For non-insider verdicts this must be exactly 1.0.",
+    )
+    non_insider_reason: str | None = Field(
+        default=None,
+        description="Required when is_insider_trading is false. Briefly explain why the document is certainly not an insider trading notice.",
+    )
+    evidence_snippets: list[str] = Field(
+        default_factory=list,
+        description="Short snippets copied from the source document that support the verdict.",
+    )
+    insider_trade: EUMarArticle19 | None = Field(
+        default=None,
+        description="Required when is_insider_trading is true.",
+    )
+
+    @model_validator(mode="after")
+    def validate_verdict_consistency(self) -> "InsiderExtractionResult":
+        if self.is_insider_trading:
+            if self.insider_trade is None:
+                raise ValueError("insider_trade is required when is_insider_trading is true.")
+            return self
+
+        if self.certainty != 1.0:
+            raise ValueError("A non-insider verdict is only allowed at certainty=1.0.")
+        if self.insider_trade is not None:
+            raise ValueError("insider_trade must be empty when is_insider_trading is false.")
+        if not self.non_insider_reason:
+            raise ValueError("non_insider_reason is required when is_insider_trading is false.")
+        if len(self.evidence_snippets) == 0:
+            raise ValueError("evidence_snippets must include at least one snippet for non-insider verdicts.")
+        return self

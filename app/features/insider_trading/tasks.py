@@ -58,9 +58,23 @@ def fetch_insider_news_job():
                                 md_text = download_and_parse_pdf(pdf_url)
 
                                 if vibe_check(md_text):
-                                    data = extract_insider_data(md_text)
-                                    trade = InsiderTrade(**data.model_dump(), document_url=pdf_url)
-                                    session.add(trade)
+                                    extraction = extract_insider_data(md_text)
+                                    if extraction.is_insider_trading:
+                                        if extraction.insider_trade is None:
+                                            raise ValueError("Missing insider_trade payload for insider document.")
+
+                                        trade = InsiderTrade(
+                                            **extraction.insider_trade.model_dump(),
+                                            document_url=pdf_url,
+                                        )
+                                        session.add(trade)
+                                    else:
+                                        logger.info(
+                                            "LLM marked %s as non-insider with certainty %.2f. Reason: %s",
+                                            pdf_url,
+                                            extraction.certainty,
+                                            extraction.non_insider_reason,
+                                        )
 
                                 log_entry = OpsDocumentLog(
                                     document_url=pdf_url,
