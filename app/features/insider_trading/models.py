@@ -7,15 +7,16 @@ class InsiderTrade(SQLModel, table=True):
     __tablename__ = "insider_trades"
     id: Optional[int] = Field(default=None, primary_key=True)
     document_url: str = Field(unique=True, index=True)
-    pdmr_name: str
-    role_position: str
-    issuer_name: str
-    issuer_lei: str = Field(max_length=20)
-    instrument_description: str
-    isin: str = Field(max_length=12)
-    nature_of_transaction: TransactionType
-    price_volume: str
-    aggregated_volume: int
-    weighted_average_price: float
-    date_of_transaction: date
-    place_of_transaction: str
+    pdmr_name: Optional[str] = None
+    role_position: Optional[str] = None
+    issuer_name: Optional[str] = None
+    issuer_lei: Optional[str] = Field(default=None, max_length=20)
+    instrument_description: Optional[str] = None
+    isin: Optional[str] = Field(default=None, max_length=12)
+    nature_of_transaction: Optional[TransactionType] = None
+    price_volume: Optional[str] = None
+    aggregated_volume: Optional[int] = None
+    weighted_average_price: Optional[float] = None
+    date_of_transaction: Optional[date] = None
+    place_of_transaction: Optional[str] = None
+    has_missing_fields: bool = Field(default=False, index=True)

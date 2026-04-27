@@ -6,8 +6,10 @@ from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 from app.utils.pdf import download_and_parse_pdf
 from app.features.insider_trading.processor import extract_insider_data, vibe_check
 
-PAGE_NUMBER = 25
-ROW_NUMBER = 4
+PAGE_NUMBER = 29
+ROW_NUMBER = 20
+OVERWRITE_PDF = "https://bet.hu/newkibdata/129445207/ANY260424ER01H.pdf"
+
 
 
 def fetch_api_page_links(page_number: int) -> list[str]:
@@ -42,22 +44,27 @@ def fetch_pdf_from_row(page_links: list[str], row_number: int) -> Optional[str]:
 
 
 def main() -> int:
-    print(f"Fetching page {PAGE_NUMBER} from the search API...")
+    if 'OVERWRITE_PDF' in globals():
+        print(f"Using overwrite PDF URL: {OVERWRITE_PDF}") # type: ignore  # noqa: F821
+        pdf_url = OVERWRITE_PDF # type: ignore  # noqa: F821
+    else:
+            
+        print(f"Fetching page {PAGE_NUMBER} from the search API...")
 
-    try:
-        links = fetch_api_page_links(PAGE_NUMBER)
-    except Exception as exc:
-        print(f"Failed to fetch page {PAGE_NUMBER}: {exc}")
-        return 1
+        try:
+            links = fetch_api_page_links(PAGE_NUMBER)
+        except Exception as exc:
+            print(f"Failed to fetch page {PAGE_NUMBER}: {exc}")
+            return 1
 
-    if not links:
-        print(f"No results found on page {PAGE_NUMBER}.")
-        return 1
+        if not links:
+            print(f"No results found on page {PAGE_NUMBER}.")
+            return 1
 
-    pdf_url = fetch_pdf_from_row(links, ROW_NUMBER)
-    if not pdf_url:
-        print(f"Could not find a PDF URL for row {ROW_NUMBER}.")
-        return 1
+        pdf_url = fetch_pdf_from_row(links, ROW_NUMBER)
+        if not pdf_url:
+            print(f"Could not find a PDF URL for row {ROW_NUMBER}.")
+            return 1
 
     print(f"Downloading and parsing PDF: {pdf_url}")
     try:

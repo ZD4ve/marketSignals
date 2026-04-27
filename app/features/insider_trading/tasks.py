@@ -1,5 +1,6 @@
 import logging
 from sqlmodel import Session, select
+from sqlalchemy import inspect, text
 from app.core.database import engine, OpsDocumentLog
 from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 from app.utils.pdf import download_and_parse_pdf
@@ -7,15 +8,54 @@ from app.features.insider_trading.processor import vibe_check, extract_insider_d
 from app.features.insider_trading.models import InsiderTrade
 
 logger = logging.getLogger(__name__)
+INSIDER_TRADES_TABLE = "insider_trades"
 
 
 def _is_announcement_subpage(url: str) -> bool:
     return "/site/newkib/" in url
 
+
+def _ensure_insider_trade_schema() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table(INSIDER_TRADES_TABLE):
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns(INSIDER_TRADES_TABLE)}
+    nullable_columns = [
+        "pdmr_name",
+        "role_position",
+        "issuer_name",
+        "issuer_lei",
+        "instrument_description",
+        "isin",
+        "nature_of_transaction",
+        "price_volume",
+        "aggregated_volume",
+        "weighted_average_price",
+        "date_of_transaction",
+        "place_of_transaction",
+    ]
+
+    with engine.begin() as connection:
+        for column_name in nullable_columns:
+            if column_name in existing_columns:
+                connection.execute(
+                    text(f"ALTER TABLE {INSIDER_TRADES_TABLE} ALTER COLUMN {column_name} DROP NOT NULL")
+                )
+
+        if "has_missing_fields" not in existing_columns:
+            connection.execute(
+                text(
+                    f"ALTER TABLE {INSIDER_TRADES_TABLE} ADD COLUMN has_missing_fields BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+
 def fetch_insider_news_job():
     logger.info("Starting insider trading job...")
 
     try:
+        _ensure_insider_trade_schema()
+
         with LiferayClient(BET_BASE_URL) as client:
             context = client.get_solr_search_context(BET_NEWS_API_URL)
 
@@ -63,11 +103,21 @@ def fetch_insider_news_job():
                                         if extraction.insider_trade is None:
                                             raise ValueError("Missing insider_trade payload for insider document.")
 
+                                        missing_fields = extraction.insider_trade.missing_fields()
+                                        trade_data = extraction.insider_trade.model_dump()
+                                        trade_data["has_missing_fields"] = bool(missing_fields)
                                         trade = InsiderTrade(
-                                            **extraction.insider_trade.model_dump(),
+                                            **trade_data,
                                             document_url=pdf_url,
                                         )
                                         session.add(trade)
+
+                                        if missing_fields:
+                                            logger.info(
+                                                "Persisted partial extraction for %s with missing fields: %s",
+                                                pdf_url,
+                                                ", ".join(missing_fields),
+                                            )
                                     else:
                                         logger.info(
                                             "LLM marked %s as non-insider with certainty %.2f. Reason: %s",

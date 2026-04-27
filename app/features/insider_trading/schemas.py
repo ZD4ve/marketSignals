@@ -9,24 +9,30 @@ class TransactionType(str, Enum):
 
 class EUMarArticle19(BaseModel):
     """Extraction schema for EU MAR Article 19 Insider Trading Notifications."""
-    pdmr_name: str = Field(description="Name of the Person Discharging Managerial Responsibilities (PDMR) or person closely associated.")
-    role_position: str = Field(description="Position/status of the PDMR within the company.")
-    issuer_name: str = Field(description="Name of the issuer company.")
-    issuer_lei: str = Field(
+    pdmr_name: str | None = Field(default=None, description="Name of the Person Discharging Managerial Responsibilities (PDMR) or person closely associated.")
+    role_position: str | None = Field(default=None, description="Position/status of the PDMR within the company.")
+    issuer_name: str | None = Field(default=None, description="Name of the issuer company.")
+    issuer_lei: str | None = Field(
+        default=None,
         pattern=r"^[A-Z0-9]{20}$",
         description="LEI (Legal Entity Identifier) code of the issuer, formatted as a 20-character uppercase alphanumeric code based on ISO 17442.",
     )
-    instrument_description: str = Field(description="Description of the financial instrument (e.g., ordinary share).")
-    isin: str = Field(
+    instrument_description: str | None = Field(default=None, description="Description of the financial instrument (e.g., ordinary share).")
+    isin: str | None = Field(
+        default=None,
         pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
         description="ISIN code of the financial instrument, formatted as a 12-character code per ISO 6166: two letters, nine alphanumeric NSIN characters, and one numeric check digit.",
     )
-    nature_of_transaction: TransactionType = Field(description="Nature of the transaction: 'buy' (Vétel) or 'sell' (Eladás).")
-    price_volume: str = Field(description="Raw text describing the individual price(s) and volume(s) of the transaction tranches.")
-    aggregated_volume: int = Field(description="Total aggregated volume (number of shares) of the transaction. Extract only the numeric integer value.")
-    weighted_average_price: float = Field(description="Weighted average price of the transaction in HUF. Extract only the numeric float value. May be next to the aggregated volume.")
-    date_of_transaction: date = Field(description="Date of the transaction.")
-    place_of_transaction: str = Field(description="Place of the transaction (e.g., Budapesti Értéktőzsde, BÉT, OTC).")
+    nature_of_transaction: TransactionType | None = Field(default=None, description="Nature of the transaction: 'buy' (Vétel) or 'sell' (Eladás).")
+    price_volume: str | None = Field(default=None, description="Raw text describing the individual price(s) and volume(s) of the transaction tranches.")
+    aggregated_volume: int | None = Field(default=None, description="Total aggregated volume (number of shares) of the transaction. Extract only the numeric integer value.")
+    weighted_average_price: float | None = Field(default=None, description="Weighted average price of the transaction in HUF. Extract only the numeric float value. May be next to the aggregated volume.")
+    date_of_transaction: date | None = Field(default=None, description="Date of the transaction.")
+    place_of_transaction: str | None = Field(default=None, description="Place of the transaction (e.g., Budapesti Értéktőzsde, BÉT, OTC).")
+    has_missing_fields: bool = Field(
+        default=False,
+        description="True when the source document did not contain one or more Article 19 fields.",
+    )
 
     @staticmethod
     def _expand_isin_characters(value: str) -> str:
@@ -48,17 +54,22 @@ class EUMarArticle19(BaseModel):
     @field_validator("isin")
     @classmethod
     def validate_isin_check_digit(cls, value: str) -> str:
+        if value is None:
+            return value
         expanded = cls._expand_isin_characters(value)
         if not cls._passes_luhn(expanded):
             raise ValueError("Invalid ISIN check digit.")
         return value
+
+    def missing_fields(self) -> list[str]:
+        return [field_name for field_name, field_value in self.model_dump().items() if field_value is None]
 
 
 class InsiderExtractionResult(BaseModel):
     """LLM output for either insider trade extraction or high-certainty rejection."""
 
     is_insider_trading: bool = Field(
-        description="True when the document is an EU MAR Article 19 insider trading notification."
+        description="True when the document is an EU MAR Article 19 PDMR transaction notification (including routine buy/sell disclosures)."
     )
     certainty: float = Field(
         ge=0.0,
@@ -67,7 +78,7 @@ class InsiderExtractionResult(BaseModel):
     )
     non_insider_reason: str | None = Field(
         default=None,
-        description="Required when is_insider_trading is false. Briefly explain why the document is certainly not an insider trading notice.",
+        description="Required when is_insider_trading is false. Briefly explain why the document is certainly not an Article 19 PDMR notification.",
     )
     evidence_snippets: list[str] = Field(
         default_factory=list,
