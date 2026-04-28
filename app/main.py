@@ -16,7 +16,7 @@ def main():
     scheduler = BackgroundScheduler()
     
     # Register jobs from modules
-    scheduler.add_job(fetch_insider_news_job, 'interval', minutes=15, next_run_time=datetime.now() + timedelta(seconds=5))
+    scheduler.add_job(fetch_insider_news_job, 'interval', hours=4, next_run_time=datetime.now() + timedelta(seconds=5))
     
     scheduler.start()
     
