@@ -261,6 +261,62 @@ class LiferayClient:
                     links.append(href)
         return links
 
+    @staticmethod
+    def extract_result_items(result_payload: dict[str, Any]) -> list[dict[str, Any]]:
+        from datetime import datetime
+        
+        # Monthly hungarian abbreviation map to map 'márc.' to '03' etc.
+        hu_months = {
+            "jan.": "01",
+            "febr.": "02",
+            "márc.": "03",
+            "ápr.": "04",
+            "máj.": "05",
+            "jún.": "06",
+            "júl.": "07",
+            "aug.": "08",
+            "szept.": "09",
+            "okt.": "10",
+            "nov.": "11",
+            "dec.": "12",
+        }
+
+        parsed_items: list[dict[str, Any]] = []
+        for item in result_payload.get("items", []):
+            fragment = item.get("data")
+            if not isinstance(fragment, str) or not fragment.strip():
+                continue
+            soup = BeautifulSoup(fragment, "html.parser")
+            anchor = soup.find("a", href=True)
+            if not anchor:
+                continue
+            href = anchor["href"].strip()
+            if not href:
+                continue
+                
+            date_span = soup.find("span", class_="list-date")
+            parsed_date = None
+            if date_span:
+                date_str = date_span.get_text(strip=True)
+                # expected format '2026. márc. 09. 10:45'
+                try:
+                    parts = date_str.split()
+                    if len(parts) >= 4:
+                        year = parts[0].strip('.')
+                        month_str = parts[1].lower()
+                        day = parts[2].strip('.')
+                        time_str = parts[3]
+                        
+                        month = hu_months.get(month_str, "01")
+                        iso_str = f"{year}-{month}-{day.zfill(2)} {time_str}"
+                        parsed_date = datetime.strptime(iso_str, "%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
+
+            parsed_items.append({"url": href, "published_date": parsed_date})
+            
+        return parsed_items
+
     def collect_announcement_subpage_urls(
         self,
         context: SolrSearchContext,

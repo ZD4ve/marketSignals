@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from .schemas import TransactionType
 
 class InsiderTrade(SQLModel, table=True):
@@ -19,4 +19,5 @@ class InsiderTrade(SQLModel, table=True):
     weighted_average_price: Optional[float] = None
     date_of_transaction: Optional[date] = None
     place_of_transaction: Optional[str] = None
+    published_date: Optional[datetime] = None
     has_missing_fields: bool = Field(default=False, index=True)

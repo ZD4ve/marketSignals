@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 
 class TransactionType(str, Enum):
@@ -29,10 +29,6 @@ class EUMarArticle19(BaseModel):
     weighted_average_price: float | None = Field(default=None, description="Weighted average price of the transaction in HUF. Extract only the numeric float value. May be next to the aggregated volume.")
     date_of_transaction: date | None = Field(default=None, description="Date of the transaction.")
     place_of_transaction: str | None = Field(default=None, description="Place of the transaction (e.g., Budapesti Értéktőzsde, BÉT, OTC).")
-    has_missing_fields: bool = Field(
-        default=False,
-        description="True when the source document did not contain one or more Article 19 fields.",
-    )
 
     @staticmethod
     def _expand_isin_characters(value: str) -> str:

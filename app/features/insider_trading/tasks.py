@@ -34,6 +34,7 @@ def _ensure_insider_trade_schema() -> None:
         "weighted_average_price",
         "date_of_transaction",
         "place_of_transaction",
+        "published_date",
     ]
 
     with engine.begin() as connection:
@@ -47,6 +48,13 @@ def _ensure_insider_trade_schema() -> None:
             connection.execute(
                 text(
                     f"ALTER TABLE {INSIDER_TRADES_TABLE} ADD COLUMN has_missing_fields BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            
+        if "published_date" not in existing_columns:
+            connection.execute(
+                text(
+                    f"ALTER TABLE {INSIDER_TRADES_TABLE} ADD COLUMN published_date TIMESTAMP NULL"
                 )
             )
 
@@ -70,80 +78,86 @@ def fetch_insider_news_job():
                     query="*",
                     order_mode="DATE_DESC",
                 ):
-                    raw_links = client.extract_result_links(page_payload)
-                    subpages = [url for url in raw_links if _is_announcement_subpage(url)]
+                    raw_items = client.extract_result_items(page_payload)
+                    subpages = [item for item in raw_items if _is_announcement_subpage(item["url"])]
                     if not subpages:
                         continue
 
                     page_has_new_documents = False
 
-                    for subpage in subpages:
+                    for subpage_data in subpages:
+                        subpage = subpage_data["url"]
+                        published_date = subpage_data["published_date"]
                         absolute_subpage = client.to_absolute_url(subpage)
-                        try:
-                            pdf_urls = client.get_pdf_urls_from_announcement_subpage(absolute_subpage)
-                        except Exception as exc:
-                            logger.warning("Failed to parse announcement subpage %s: %s", absolute_subpage, exc)
+                        
+                        exists = session.exec(
+                            select(OpsDocumentLog).where(OpsDocumentLog.document_url == absolute_subpage)
+                        ).first()
+                        if exists:
                             continue
 
-                        for pdf_url in pdf_urls:
-                            exists = session.exec(
-                                select(OpsDocumentLog).where(OpsDocumentLog.document_url == pdf_url)
-                            ).first()
-                            if exists:
+                        page_has_new_documents = True
+
+                        try:
+                            pdf_urls = client.get_pdf_urls_from_announcement_subpage(absolute_subpage)
+                            
+                            if not pdf_urls:
                                 continue
+                                
+                            md_texts = []
+                            for pdf_url in pdf_urls:
+                                md_texts.append(download_and_parse_pdf(pdf_url))
+                            
+                            md_text = "\n\n---\n\n".join(md_texts)
 
-                            page_has_new_documents = True
+                            if vibe_check(md_text):
+                                extraction = extract_insider_data(md_text)
+                                if extraction.is_insider_trading:
+                                    if extraction.insider_trade is None:
+                                        raise ValueError("Missing insider_trade payload for insider document.")
 
-                            try:
-                                md_text = download_and_parse_pdf(pdf_url)
+                                    missing_fields = extraction.insider_trade.missing_fields()
+                                    trade_data = extraction.insider_trade.model_dump()
+                                    trade_data["has_missing_fields"] = bool(missing_fields)
+                                    trade_data["published_date"] = published_date
+                                    trade = InsiderTrade(
+                                        **trade_data,
+                                        document_url=absolute_subpage,
+                                    )
+                                    session.add(trade)
 
-                                if vibe_check(md_text):
-                                    extraction = extract_insider_data(md_text)
-                                    if extraction.is_insider_trading:
-                                        if extraction.insider_trade is None:
-                                            raise ValueError("Missing insider_trade payload for insider document.")
-
-                                        missing_fields = extraction.insider_trade.missing_fields()
-                                        trade_data = extraction.insider_trade.model_dump()
-                                        trade_data["has_missing_fields"] = bool(missing_fields)
-                                        trade = InsiderTrade(
-                                            **trade_data,
-                                            document_url=pdf_url,
-                                        )
-                                        session.add(trade)
-
-                                        if missing_fields:
-                                            logger.info(
-                                                "Persisted partial extraction for %s with missing fields: %s",
-                                                pdf_url,
-                                                ", ".join(missing_fields),
-                                            )
-                                    else:
+                                    if missing_fields:
                                         logger.info(
-                                            "LLM marked %s as non-insider with certainty %.2f. Reason: %s",
-                                            pdf_url,
-                                            extraction.certainty,
-                                            extraction.non_insider_reason,
+                                            "Persisted partial extraction for %s with missing fields: %s",
+                                            absolute_subpage,
+                                            ", ".join(missing_fields),
                                         )
+                                else:
+                                    logger.info(
+                                        "LLM marked %s as non-insider with certainty %.2f. Reason: %s",
+                                        absolute_subpage,
+                                        extraction.certainty,
+                                        extraction.non_insider_reason,
+                                    )
 
-                                log_entry = OpsDocumentLog(
-                                    document_url=pdf_url,
-                                    module_name="insider_trading",
-                                    status="SUCCESS",
-                                )
-                                session.add(log_entry)
-                                session.commit()
-                                processed_new_documents += 1
-                            except Exception as exc:
-                                logger.error("Error processing %s: %s", pdf_url, exc)
-                                log_entry = OpsDocumentLog(
-                                    document_url=pdf_url,
-                                    module_name="insider_trading",
-                                    status="FAILED",
-                                )
-                                session.add(log_entry)
-                                session.commit()
-                                failed_documents += 1
+                            log_entry = OpsDocumentLog(
+                                document_url=absolute_subpage,
+                                module_name="insider_trading",
+                                status="SUCCESS",
+                            )
+                            session.add(log_entry)
+                            session.commit()
+                            processed_new_documents += 1
+                        except Exception as exc:
+                            logger.error("Error processing %s: %s", absolute_subpage, exc)
+                            log_entry = OpsDocumentLog(
+                                document_url=absolute_subpage,
+                                module_name="insider_trading",
+                                status="FAILED",
+                            )
+                            session.add(log_entry)
+                            session.commit()
+                            failed_documents += 1
 
                     if page_has_new_documents:
                         stale_pages = 0
