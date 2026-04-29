@@ -19,4 +19,6 @@ COPY . .
 # Ensure Python can find the app module
 ENV PYTHONPATH=/app
 
-CMD ["python", "app/main.py"]
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:api", "--host", "0.0.0.0", "--port", "8000"]

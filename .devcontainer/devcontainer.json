@@ -38,6 +38,7 @@
     },
     // Run the container as root to avoid permission issues editing mounted files
     "remoteUser": "root",
+    "updateContentCommand": "apt-get update && apt-get install -y bubblewrap socat",
     "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir pytest debugpy ruff",
     "features": {
         "ghcr.io/devcontainers/features/git:1": {}
