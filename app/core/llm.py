@@ -1,6 +1,6 @@
 import instructor
 from openai import OpenAI
-from core.config import settings
+from app.core.config import settings
 
 # Initialize the LLM client using environment-configurable endpoint and key
 llm_api_key = settings.LLM_API_KEY

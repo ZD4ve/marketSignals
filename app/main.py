@@ -8,9 +8,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from core.database import init_db
-from features.insider_trading.tasks import fetch_insider_news_job
-from features.insider_trading.router import router as insider_trading_router
+from app.core.database import init_db
+from app.features.insider_trading.tasks import fetch_insider_news_job
+from app.features.insider_trading.router import router as insider_trading_router
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
