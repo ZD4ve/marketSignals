@@ -2,9 +2,9 @@ import json
 import os
 from typing import Optional
 
-from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
-from app.utils.pdf import download_and_parse_pdf
-from app.features.insider_trading.processor import extract_insider_data, vibe_check
+from scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
+from utils.pdf import download_and_parse_pdf
+from features.insider_trading.processor import extract_insider_data, vibe_check
 
 PAGE_NUMBER = 29
 ROW_NUMBER = 20

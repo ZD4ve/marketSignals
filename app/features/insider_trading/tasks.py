@@ -1,11 +1,11 @@
 import logging
 from sqlmodel import Session, select
 from sqlalchemy import inspect, text
-from app.core.database import engine, OpsDocumentLog
-from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
-from app.utils.pdf import download_and_parse_pdf
-from app.features.insider_trading.processor import vibe_check, extract_insider_data
-from app.features.insider_trading.models import InsiderTrade
+from core.database import engine, OpsDocumentLog
+from scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
+from utils.pdf import download_and_parse_pdf
+from features.insider_trading.processor import vibe_check, extract_insider_data
+from features.insider_trading.models import InsiderTrade
 
 logger = logging.getLogger(__name__)
 INSIDER_TRADES_TABLE = "insider_trades"
@@ -72,12 +72,33 @@ def fetch_insider_news_job():
             stale_pages = 0
 
             with Session(engine) as session:
+                archive_marker = session.exec(
+                    select(OpsDocumentLog).where(
+                        OpsDocumentLog.module_name == "insider_trading",
+                        OpsDocumentLog.document_url == "__insider_trading_full_archive_completed__",
+                    )
+                ).first()
+                is_full_archive_completed = archive_marker is not None
+                perform_full_archive_scan = not is_full_archive_completed
+                stopped_early = False
+
+                logger.info(
+                    "Insider trading crawl starting in %s mode",
+                    "full archive" if perform_full_archive_scan else "incremental",
+                )
+
                 for page_index, page_payload in client.iterate_solr_pages(
                     context=context,
                     category="NEWS_NOT_BET",
                     query="*",
                     order_mode="DATE_DESC",
                 ):
+                    page_count = page_payload.get("pageCount") if isinstance(page_payload, dict) else None
+                    logger.info(
+                        "Processing page %s%s",
+                        page_index,
+                        f" of {page_count}" if isinstance(page_count, int) else "",
+                    )
                     raw_items = client.extract_result_items(page_payload)
                     subpages = [item for item in raw_items if _is_announcement_subpage(item["url"])]
                     if not subpages:
@@ -164,10 +185,21 @@ def fetch_insider_news_job():
                     else:
                         stale_pages += 1
 
-                    # Sorted DATE_DESC means old pages after two stale pages are almost certainly already processed.
-                    if stale_pages >= 2:
-                        logger.info("Stopping early at page %s after stale window", page_index)
-                        break
+                    if not perform_full_archive_scan:
+                        # Sorted DATE_DESC means old pages after two stale pages are almost certainly already processed.
+                        if stale_pages >= 2:
+                            logger.info("Stopping early at page %s after stale window", page_index)
+                            stopped_early = True
+                            break
+
+                if perform_full_archive_scan and not stopped_early:
+                    marker = OpsDocumentLog(
+                        document_url="__insider_trading_full_archive_completed__",
+                        module_name="insider_trading",
+                        status="SUCCESS",
+                    )
+                    session.add(marker)
+                    session.commit()
 
             logger.info(
                 "Insider job finished. New=%s Failed=%s",

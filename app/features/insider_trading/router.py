@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
-from app.core.database import get_session
-from app.features.insider_trading.models import InsiderTrade
+from core.database import get_session
+from features.insider_trading.models import InsiderTrade
 from typing import List
 
 router = APIRouter(prefix="/api/insider-trades", tags=["insider_trading"])

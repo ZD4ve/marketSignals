@@ -1,6 +1,6 @@
 import re
-from app.core.llm import get_llm_client, get_openrouter_provider_body
-from app.features.insider_trading.schemas import InsiderExtractionResult
+from core.llm import get_llm_client, get_openrouter_provider_body
+from features.insider_trading.schemas import InsiderExtractionResult
 
 def vibe_check(markdown_text: str) -> bool:
     keywords = [
@@ -22,7 +22,7 @@ def vibe_check(markdown_text: str) -> bool:
 def extract_insider_data(markdown_text: str) -> InsiderExtractionResult:
     client = get_llm_client()
 
-    from app.core.config import settings
+    from core.config import settings
 
     prompt = (
         "Decide whether this document is an EU MAR Article 19 PDMR dealing notification and return JSON that matches the schema.\n"

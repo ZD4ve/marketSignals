@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, create_engine, Session, Field
 from datetime import datetime, timezone
 from typing import Optional
-from app.core.config import settings
+from core.config import settings
 
 engine = create_engine(settings.database_url, echo=False)
 

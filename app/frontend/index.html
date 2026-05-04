@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BET Insider Trades</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 24px; background: #f7f8fb; color: #111; }
+    h1 { margin-bottom: 8px; }
+    p { margin-top: 0; color: #555; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08); padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5e7eb; }
+    th { color: #374151; font-weight: 700; }
+    td { color: #111827; }
+    #status { margin-top: 12px; color: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>BET Insider Trades</h1>
+    <p>Live data from the Insider Trading API.</p>
+    <div id="status">Loading insider trades…</div>
+    <table id="trades-table" hidden>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>PDMR Name</th>
+          <th>Issuer</th>
+          <th>Transaction</th>
+          <th>Volume</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadTrades() {
+      const status = document.getElementById('status');
+      try {
+        const response = await fetch('/api/insider-trades/');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const trades = await response.json();
+        const table = document.getElementById('trades-table');
+        const tbody = table.querySelector('tbody');
+
+        if (!Array.isArray(trades) || trades.length === 0) {
+          status.textContent = 'No insider trades available yet.';
+          return;
+        }
+
+        trades.forEach(trade => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${trade.id ?? ''}</td>
+            <td>${trade.pdmr_name ?? ''}</td>
+            <td>${trade.issuer_name ?? ''}</td>
+            <td>${trade.nature_of_transaction ?? ''}</td>
+            <td>${trade.aggregated_volume ?? ''}</td>
+            <td>${trade.date_of_transaction ?? ''}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        status.textContent = `${trades.length} insider trade(s) loaded.`;
+        table.hidden = false;
+      } catch (error) {
+        status.textContent = 'Unable to load insider trades.';
+        console.error(error);
+      }
+    }
+
+    loadTrades();
+  </script>
+</body>
+</html>

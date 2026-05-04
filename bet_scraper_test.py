@@ -18,7 +18,7 @@ import argparse
 import json
 from pathlib import Path
 
-from app.scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
+from scraper.client import LiferayClient, BET_BASE_URL, BET_NEWS_API_URL
 
 
 def main() -> int:
